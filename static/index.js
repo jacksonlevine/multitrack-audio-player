@@ -77,6 +77,14 @@ class MultiTrackPlayer
         this.tracks[index].stop(audioContext.currentTime+0.1);
         this.tracks[index].muted = true;
         this.tracks[index].soloed = false;
+
+        for(let i of this.tracks)
+        {
+            if(i.soloed)
+            {
+                i.soloed = false;
+            }
+        }
     }
 
     unmute(index)
