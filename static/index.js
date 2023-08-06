@@ -1,185 +1,218 @@
-let audioContext = new AudioContext();
-let startTime = 0;  // To store the time when the audio started.
-let pauseAt = 0;    // To store how much of the audio has been played before pausing.
+audioContext = new AudioContext();
+tracksLoaded = false;
 
-let tracks = [
-  "/tracks/t1.mp3", 
-  "/tracks/t2.mp3", 
-  "/tracks/t3.mp3",
-  "/tracks/t4.mp3",
-  "/tracks/t5.mp3"
-];
-
-let buffers = [];
-let sources = [];
-let isAudioPlaying = false;
-let tracksLoaded = false;
-
-let muted = [];
-let soloed = [];
-
-let mutehandle = (e) => {
-  if(tracksLoaded)
-  {
-    let index = e.target.id.split("_")[0];
-    
-    if(muted[index] === false)
+class Track {
+    constructor(buffer)
     {
-      sources.forEach(source => {
-        if(source.index === index)
-        {
-          source.source.stop();
+        this.buffer = buffer;
+        this.source = "";
+
+        this.muted = false;
+        this.soloed = false;
+
+    }
+
+    start(delayedStart, offset)
+    {
+        if(!this.muted){
+        this.source = audioContext.createBufferSource();
+        this.source.buffer = this.buffer;
+        this.source.connect(audioContext.destination);
+
+        this.source.start(delayedStart, offset+(delayedStart-audioContext.currentTime));
         }
-      })
-      muted[index] = true;
-    } else {
-        let source = audioContext.createBufferSource();
-        let offset = audioContext.currentTime - startTime;
-        source.buffer = buffers[index];
-        source.connect(audioContext.destination);
-        source.start(startTime, offset);
-        sources.push({source, index});
-      muted[index] = false;
+    }
+
+    stop(delayedStop)
+    {
         
+            this.source.stop(delayedStop);
+        
+
     }
-  }
+
+
 }
-let solohandle = (e) => {
-  if(tracksLoaded)
-  {
-    let index = e.target.id.split("_")[0];
-    
-    if(soloed[index] === false)
+
+class MultiTrackPlayer
+{
+    constructor(songName)
     {
-      sources.forEach((source) => {
-        if(source.index != index) {
-          source.source.stop();
-        }
-      })
-      for(let i = 0; i < muted.length; i++)
-      {
-        if(i !== index)
-        {
-          muted[i] = true;
-        } else {
-          muted[i] = false;
-        }
-      }
-      for(let i = 0; i < soloed.length; i++)
-      {
-        if(i !== index)
-        {
-          soloed[i] = false;
-        } else {
-          soloed[i] = true;
-        }
-      }
-      soloed[index] = true;
-    } else {
-      soloed[index] = false;
-      sources.forEach(source => {
-        source.source.stop();
-      })
-      sources = buffers.map((buffer, ind) => {
-
-
-          let source = audioContext.createBufferSource();
-          source.buffer = buffer;
-          source.connect(audioContext.destination);
-          let offset = audioContext.currentTime - startTime;
-          source.start(startTime, offset);
-          return {source, index: ind};
-
-      });
+        this.songName = songName;
+        this.paused = true;
+        this.startTime = 0;
+        this.pausedAt = 0;
+        this.tracks = [];
     }
-    
-  }
-}
 
-onload = ()=>{
-
-  let promises = tracks.map((track, index) => {
-    return fetch(track)
-      .then(response => response.arrayBuffer())
-      .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
-      .then(audioBuffer => {
-        buffers[index] = audioBuffer;
-      });
-  });
-  let trackControlDiv = document.getElementById("trackControls")
-
-  let newGroup = document.createElement("div");
-
-  tracks.map((track, index) => {
-    let newDiv = document.createElement("div");
-    newDiv.setAttribute("class", "horizontal");
-
-    let button1 = document.createElement("button");
-    button1.innerText = "Mute";
-    button1.setAttribute("id", index + "_mute");
-    button1.onclick = mutehandle;
-
-    let button2 = document.createElement("button");
-    button2.innerText = "Solo";
-    button2.setAttribute("id", index + "_solo");
-    button2.onclick = solohandle;
-
-    newDiv.appendChild(button1);
-    newDiv.appendChild(button2);
-
-    let p = document.createElement("p");
-    p.innerText = track;
-
-    newDiv.appendChild(p);
-
-    newGroup.appendChild(newDiv)
-
-    muted.push(false);
-    soloed.push(false);
-  })
-
-  trackControlDiv.innerHTML = "";
-  trackControlDiv.appendChild(newGroup);
+    fetchTracks()
+    {
+        tracksLoaded = false;
+        return fetch("/tracks/" + this.songName + "/list")
+            .then(response => response.json())
+            .then(data => {
 
 
-  Promise.all(promises).then(() => {
-    document.getElementById("loading").setAttribute("class", "hidden");
-    tracksLoaded = true;
-  });
+                let promises = data.tracks.map((track) => {
+                    return fetch(`/tracks/${this.songName}/${track}`)
+                      .then(response => response.arrayBuffer())
+                      .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+                      .then(audioBuffer => {
+                        let trk = new Track(audioBuffer);
+                        this.tracks.push(trk);
+                      });
+                });
+                Promise.all(promises).then(() => {
+                    document.getElementById("loading").setAttribute("class", "hidden");
+                    console.log(this.tracks)
+                    tracksLoaded = true;
+                    this.createUI("trackControls");
+                });
 
-  document.getElementById("play")
-    .addEventListener("click", ()=>{
-      if(!isAudioPlaying)
-      {
+            })
+    }
+
+    mute(index)
+    {
+        this.tracks[index].stop(audioContext.currentTime);
+        this.tracks[index].muted = true;
+        this.tracks[index].soloed = false;
+    }
+
+    unmute(index)
+    {
+        this.tracks[index].muted = false;
+        this.tracks[index].start(audioContext.currentTime, (this.pausedAt + audioContext.currentTime - this.startTime))
+    }
+
+    play()
+    {
         if(audioContext.state === 'suspended') {
-          audioContext.resume();
+            audioContext.resume();
         }
 
-        let startTime = audioContext.currentTime + 0.1;
-        let offset = pauseAt;
-        sources = buffers.map((buffer, index) => {
-          if(muted[index] === false)
-          {
-            let source = audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioContext.destination);
-            source.start(startTime, offset);
-            return {source, index};
-          }
-        });
-        startTime = audioContext.currentTime;
+        this.startTime = audioContext.currentTime;
+        this.paused = false;
+        let del = audioContext.currentTime + 0.1;
+        for(let i of this.tracks)
+        {
+            i.start(del, this.pausedAt);
+        }
+    }
 
-        isAudioPlaying = true;
+    pause()
+    {
+        this.paused = true;
+        this.pausedAt += audioContext.currentTime - this.startTime;
 
-      } else {
-        let stopTime = audioContext.currentTime + 0.1;
+        let del = audioContext.currentTime + 0.1;
+        for(let i of this.tracks)
+        {
+            i.stop(del);
+        }
+    }
 
-        sources.forEach(source => {
-          source.source.stop(stopTime);
-        });
-        pauseAt += audioContext.currentTime - startTime;
+    play_or_pause()
+    {
+        if(this.paused)
+        {
+            this.play();
+        } else {
+            this.pause();
+        }
+    }
+
+    mutehandle = (e) =>
+    {
+        let index = e.target.id.split("_")[0];
+        if(this.tracks[index].muted)
+        {
+            this.mute(index);
+        } else {
+            this.unmute(index);
+        }
+            
+    }
+    solohandle = (e) =>
+    {
+        let index = e.target.id.split("_")[0];
+        if(!this.tracks[index].soloed)
+        {
+            this.tracks.forEach((track, ind)=> {
+                if(ind != index)
+                {
+                    this.mute(ind);
+                }
+            })
+            this.tracks[index].soloed = true;
+        } else {
+            this.tracks.forEach((track, ind)=> {
+                if(ind != index)
+                {
+                    this.unmute(ind);
+                }
+
+            })
+            this.tracks[index].soloed = false;
+        }
         
-        isAudioPlaying = false;
-      }
-    })
+    }
+
+    createUI(divId)
+    {
+        let trackControlDiv = document.getElementById(divId)
+
+        let newGroup = document.createElement("div");
+        let index = 0;
+        for(let i of this.tracks){
+            let newDiv = document.createElement("div");
+            newDiv.setAttribute("class", "horizontal");
+
+            let button1 = document.createElement("button");
+            button1.innerText = "Mute";
+            button1.setAttribute("id", index + "_mute");
+
+
+            let button2 = document.createElement("button");
+            button2.innerText = "Solo";
+            button2.setAttribute("id", index + "_solo");
+
+
+            button1.addEventListener("click", (e) => this.mutehandle(e));
+            button2.addEventListener("click", (e) => this.solohandle(e));
+
+            newDiv.appendChild(button1);
+            newDiv.appendChild(button2);
+
+            let p = document.createElement("p");
+            p.innerText = this.songName + " " + index;
+
+            newDiv.appendChild(p);
+
+            newGroup.appendChild(newDiv)
+            index++;
+        }
+
+        let newDiv = document.createElement("div");
+        newDiv.setAttribute("class", "horizontal");
+
+        let button1 = document.createElement("button");
+        button1.setAttribute("id", "play");
+        button1.innerText = "Play/Pause";
+        button1.addEventListener("click", () => this.play_or_pause());
+
+        newDiv.appendChild(button1);
+
+
+        trackControlDiv.innerHTML = "";
+        trackControlDiv.appendChild(newGroup);
+        trackControlDiv.appendChild(newDiv);
+    }
+}
+
+onload = () => {
+    mult = new MultiTrackPlayer("pocoloco");
+    mult.fetchTracks();
+
+    
 }

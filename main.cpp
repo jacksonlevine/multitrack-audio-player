@@ -2,7 +2,7 @@
 #include <string>
 #include "sodium.h"
 #include "jackspvars/pvarslib.hpp"
-
+#include <filesystem>
 #include <map>
 #include <sstream>
 
@@ -128,12 +128,48 @@ int main()
         return load_file("index.html");
     });
 
+    CROW_ROUTE(app, "/tracks/list")
+    ([](){
+        std::string path = "./static/tracks/";
+        std::vector<std::string> folders;
+        for(const auto & entry : std::filesystem::directory_iterator(path))
+            if(entry.is_directory())
+                folders.push_back(entry.path().filename().string());
+        crow::json::wvalue x;
+        x["songs"] = std::move(folders);
+        return crow::response(x);
+    });
 
-    CROW_ROUTE(app, "/tracks/<string>")
-    ([](const crow::request& req, std::string filename){
+    CROW_ROUTE(app, "/tracks/<string>/list")
+    ([](const crow::request& req, std::string song){
+        std::string path = std::string("./static/tracks/") + song + "/";
+
+        std::cout << "Looking for files in: " << path << std::endl;
+
+        if (!std::filesystem::exists(path)) {
+            std::cout << "Directory does not exist" << std::endl;
+            return crow::response(404);
+        }
+
+        std::vector<std::string> files;
+        for(const auto & entry : std::filesystem::directory_iterator(path)) {
+            if(entry.path().extension() == ".mp3")
+                files.push_back(entry.path().filename().string());
+        }
+
+        std::cout << "Found " << files.size() << " .mp3 files" << std::endl;
+
+        crow::json::wvalue x;
+        x["tracks"] = std::move(files);
+        return crow::response(x);
+    });
+
+
+    CROW_ROUTE(app, "/tracks/<string>/<string>")
+    ([](const crow::request& req, std::string songname, std::string filename){
         crow::response response;
 
-        std::ifstream file("./static/tracks/" + filename, std::ios::binary);
+        std::ifstream file((("./static/tracks/" + songname) + "/") + filename, std::ios::binary);
         if (file) {
             response.body = std::string((std::istreambuf_iterator<char>(file)),
                                          std::istreambuf_iterator<char>());
