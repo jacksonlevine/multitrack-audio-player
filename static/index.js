@@ -78,19 +78,25 @@ class MultiTrackPlayer
         this.tracks[index].muted = true;
         this.tracks[index].soloed = false;
 
-        for(let i of this.tracks)
-        {
-            if(i.soloed)
-            {
-                i.soloed = false;
-            }
-        }
+        document.getElementById(index + "_mute").setAttribute("class", "btn btn-primary mb1 black bg-aqua")
+
     }
 
     unmute(index)
     {
         this.tracks[index].muted = false;
         this.tracks[index].start(audioContext.currentTime, (this.pausedAt + audioContext.currentTime - this.startTime))
+        let ind = 0;
+        for(let i of this.tracks)
+        {
+            if(i.soloed)
+            {
+                i.soloed = false;
+                document.getElementById(ind + "_solo").setAttribute("class", "btn btn-primary mb1 black bg-silver")
+            }
+            ind++;
+        }
+        document.getElementById(index + "_mute").setAttribute("class", "btn btn-primary mb1 black bg-silver")
     }
 
     play()
@@ -144,6 +150,10 @@ class MultiTrackPlayer
     solohandle = (e) =>
     {
         let index = e.target.id.split("_")[0];
+        if(this.tracks[index].muted)
+        {
+            this.unmute(index);
+        }
         if(!this.tracks[index].soloed)
         {
             this.tracks.forEach((track, ind)=> {
@@ -153,6 +163,7 @@ class MultiTrackPlayer
                 }
             })
             this.tracks[index].soloed = true;
+            document.getElementById(index + "_solo").setAttribute("class", "btn btn-primary mb1 black bg-red")
         } else {
             this.tracks.forEach((track, ind)=> {
                 if(ind != index)
@@ -162,6 +173,7 @@ class MultiTrackPlayer
 
             })
             this.tracks[index].soloed = false;
+            document.getElementById(index + "_solo").setAttribute("class", "btn btn-primary mb1 black bg-silver")
         }
         
     }
@@ -177,17 +189,20 @@ class MultiTrackPlayer
             newDiv.setAttribute("class", "horizontal");
 
             let button1 = document.createElement("button");
-            button1.innerText = "Mute";
+            button1.innerText = "M";
             button1.setAttribute("id", index + "_mute");
 
 
             let button2 = document.createElement("button");
-            button2.innerText = "Solo";
+            button2.innerText = "S";
             button2.setAttribute("id", index + "_solo");
 
 
             button1.addEventListener("click", (e) => this.mutehandle(e));
             button2.addEventListener("click", (e) => this.solohandle(e));
+
+            button1.setAttribute("class", "btn btn-primary mb1 black bg-silver");
+            button2.setAttribute("class", "btn btn-primary mb1 black bg-silver");
 
             newDiv.appendChild(button1);
             newDiv.appendChild(button2);
