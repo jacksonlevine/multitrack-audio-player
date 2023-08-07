@@ -1,24 +1,22 @@
-<!DOCTYPE html>
 <html>
-  <head>
-    <title>Tester Audio</title>
-    <script src="/static/index.js"></script>
-    <link href="https://unpkg.com/basscss@7.1.1/css/basscss.min.css" rel="stylesheet">
-    <style>
-      .hidden {
-        display:none;
-        visibility:hidden;
-      }
-      .horizontal {
-        display:flex;
-        flex-direction: row;
-      }
-    </style>
   </head>
+    <script src="https://unpkg.com/wavesurfer-multitrack/dist/multitrack.min.js"></script>
+    
+  <head>
   <body>
-    <p id="loading">Loading tracks...</p>
-    <div id="trackControls">
+    <label>
+      Zoom: <input type="range" min="10" max="100" value="10" />
+    </label>
+    
+    <div id="loading">Loading tracks...</div>
 
+    <div style="margin: 2em 0">
+      <button id="play">Play</button>
+      <button id="forward">Forward 30s</button>
+      <button id="backward">Back 30s</button>
     </div>
+
+    <div id="multitrack" style="background: #2d2d2d; color: #fff"></div>
+    <script src="/static/index.js"></script>
   </body>
 </html>
